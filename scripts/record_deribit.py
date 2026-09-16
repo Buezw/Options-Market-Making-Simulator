@@ -24,12 +24,28 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Stop after this many seconds (default: run indefinitely)",
     )
+    parser.add_argument(
+        "--flush-interval",
+        type=float,
+        default=300.0,
+        help="Seconds of messages to buffer before writing a parquet part "
+        "(default: 300s -- a short interval is fine for a quick smoke test "
+        "but produces an unreasonable number of small files over a long run)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    asyncio.run(record(args.currency, args.depth, args.out, duration=args.duration))
+    asyncio.run(
+        record(
+            args.currency,
+            args.depth,
+            args.out,
+            flush_interval=args.flush_interval,
+            duration=args.duration,
+        )
+    )
 
 
 if __name__ == "__main__":
