@@ -1,0 +1,33 @@
+data:
+  start: 2026-10-01
+  end: 2026-10-31
+  expiries: all
+  min_open_interest: 10
+
+surface:
+  model: svi
+  refit_interval: 5min
+  weighting: vega
+
+quoting:
+  base_half_spread_vol: 0.5        # vol points
+  vega_spread_coef: 0.0            # tune in parameter sweep
+  gamma_spread_coef: 0.0
+  inventory_skew_coef: 0.0
+  quote_size: 1
+
+risk_limits:
+  max_net_vega: 0.0                # set per account size
+  max_net_gamma: 0.0
+  max_position_per_contract: 0
+
+hedging:
+  instrument: BTC-PERPETUAL
+  rule: band                       # interval | band | whalley_wilmott
+  band: 0.0
+
+fill_model: replay                 # replay | poisson
+
+costs:
+  option_fee: 0.0                  # use the current Deribit fee schedule
+  future_fee: 0.0
