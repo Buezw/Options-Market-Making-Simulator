@@ -314,12 +314,25 @@ A full write-up is in [`reports/report.md`](reports/report.md).
 | `test_svi.py` | Fit recovers known parameters from synthetic smiles |
 | `test_arbitrage.py` | Detects constructed butterfly and calendar violations |
 | `test_attribution.py` | On simulated paths, attribution residual is small and hedged PnL matches the gamma-theta relation |
+| `test_interpolate.py` | Cross-expiry surface matches listed slices exactly and stays calendar-arbitrage-free between them |
+| `test_hedging.py` | Fixed-interval/band/Whalley-Wilmott rules trigger and size trades correctly on a synthetic price path |
+| `test_hedger.py` | Hedge execution charges fee + half-spread slippage and updates the portfolio correctly |
+| `test_inventory.py` | Vega-bucket/gamma/position risk limits pause the correct quote side |
+| `test_quoter.py` | Spread widens with vega/gamma coefficients; inventory skews quoted vol; risk limits pause a side |
+| `test_fill_model.py` | Poisson fill rate matches its theoretical probability; replay fills only when a trade crosses the quote |
+| `test_queue_model.py` | Replay fills only fire once observed trade volume (and cancellations) exhaust the queue ahead of us |
+| `test_portfolio.py` | Aggregate Greeks and mark-to-market match manual calculation from known positions |
+| `test_engine.py` | Hand-traced fill → hedge → PnL-attribution scenario; surface refit recovers a known smile from a ticker stream |
+| `test_loader.py` | Recorded parquet parses and merges into timestamp order; BTC/ETH option premiums convert from coin to USD |
+| `test_ssvi.py` | Joint SSVI fit recovers known global params; fitted surface is calendar-arbitrage-free |
+| `test_sabr.py` | Hagan SABR fit recovers known params from a synthetic smile; ATM formula matches the closed form |
+| `test_metrics.py` | Sharpe/max-drawdown/edge-per-contract match hand calculation on a known PnL series |
 
 ---
 
 ## Limitations
 
-- **Queue position is not modelled.** Replay fills assume our quote is filled whenever the market trades through it, which is optimistic at the touch.
+- **Queue position isn't modelled by default.** The main replay fill model assumes our quote is filled whenever the market trades through it, which is optimistic at the touch. A queue-aware alternative exists (`mm/queue_model.py`, tracking resting size ahead of us and consuming it via trade prints and observed cancellations) but hasn't been validated against real data yet.
 - **No market impact.** Our own quotes and hedges do not move the recorded market.
 - **Latency is idealized.** Quote updates are assumed to take effect at the next event.
 - **Single venue.** Cross-venue hedging and funding-rate effects on the perpetual are simplified.
@@ -334,12 +347,18 @@ These assumptions bias results upward; the report states each one next to the af
 - [x] Black-76 pricing, Greeks, implied vol solver
 - [x] SVI fitting and arbitrage checks
 - [x] PnL attribution validated on simulated paths
-- [x] Data recorder (loader still pending -- nothing to load until there's more data on disk)
-- [ ] Hedging rule comparison on real data
-- [ ] Quoter, inventory manager and fill models
-- [ ] Event-driven backtest engine
-- [ ] Final report and figures
-- [ ] Extensions: SSVI surface, SABR comparison, queue-position model, ETH options
+- [x] Data recorder
+- [x] Data loader (parses recorded parquet into a replayable, timestamp-ordered event stream)
+- [x] Hedging rules (fixed interval / band / Whalley-Wilmott), tested on synthetic price paths
+- [ ] Hedging rule comparison on real data (pipeline works end-to-end; not enough recorded history yet for the numbers to mean anything)
+- [x] Quoter, inventory manager and fill models
+- [x] Event-driven backtest engine
+- [ ] Final report and figures (`scripts/run_backtest.py` runs and produces figures; the numbers in [Results](#results) and `reports/report.md` stay TBD until there's enough recorded data)
+- Extensions:
+  - [x] SSVI surface (`surface/ssvi.py`, joint fit across expiries)
+  - [x] SABR comparison (`surface/sabr.py`, Hagan's lognormal approximation)
+  - [x] Queue-position fill model (`mm/queue_model.py`)
+  - [x] ETH options (pipeline is currency-generic and unit-tested against synthetic ETH data; no real ETH data recorded yet)
 
 ---
 
@@ -347,6 +366,7 @@ These assumptions bias results upward; the report states each one next to the af
 
 - Gatheral, J. (2006). *The Volatility Surface: A Practitioner's Guide.* Wiley.
 - Gatheral, J., & Jacquier, A. (2014). Arbitrage-free SVI volatility surfaces. *Quantitative Finance*, 14(1).
+- Hagan, P. S., Kumar, D., Lesniewski, A. S., & Woodward, D. E. (2002). Managing smile risk. *Wilmott Magazine*.
 - Avellaneda, M., & Stoikov, S. (2008). High-frequency trading in a limit order book. *Quantitative Finance*, 8(3).
 - Whalley, A. E., & Wilmott, P. (1997). An asymptotic analysis of an optimal hedging model for option pricing with transaction costs. *Mathematical Finance*, 7(3).
 - Sinclair, E. (2013). *Volatility Trading* (2nd ed.). Wiley.
