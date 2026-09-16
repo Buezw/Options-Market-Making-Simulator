@@ -5,6 +5,7 @@ import pytest
 
 from btc_options_mm.data.recorder import (
     _build_channels,
+    _flush_all,
     normalize_book_message,
     normalize_ticker_message,
     normalize_trade_message,
@@ -92,6 +93,41 @@ def test_write_partition_round_trips_through_parquet(tmp_path):
 def test_write_partition_raises_on_empty_rows(tmp_path):
     with pytest.raises(ValueError):
         write_partition([], "ticker", tmp_path)
+
+
+def test_flush_all_drops_batch_and_logs_on_write_failure(tmp_path, monkeypatch, caplog):
+    # A write failure (e.g. disk full / quota hit) must not crash a
+    # long-running background recorder or accumulate unboundedly in memory --
+    # it should log and drop that interval's batch, then carry on.
+    def failing_write_partition(rows, table, out_dir):
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr("btc_options_mm.data.recorder.write_partition", failing_write_partition)
+
+    buffers = {
+        "orderbook": [normalize_ticker_message(SAMPLE_TICKER)],
+        "ticker": [],
+        "trades": [],
+    }
+    with caplog.at_level("ERROR"):
+        _flush_all(buffers, tmp_path)
+
+    assert buffers["orderbook"] == []
+    assert "Failed to write" in caplog.text
+
+
+def test_flush_all_writes_normally_when_no_failure(tmp_path):
+    buffers = {
+        "orderbook": [],
+        "ticker": [normalize_ticker_message(SAMPLE_TICKER)],
+        "trades": [],
+    }
+    _flush_all(buffers, tmp_path)
+
+    assert buffers["ticker"] == []
+    files = list((tmp_path / "ticker").glob("date=*/*.parquet"))
+    assert len(files) == 1
+    assert pd.read_parquet(files[0]).iloc[0]["mark_price"] == 65000.7
 
 
 def test_build_channels_rejects_invalid_depth():

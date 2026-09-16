@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
+import signal
 import time
 import uuid
 from collections.abc import Callable
@@ -20,6 +22,8 @@ from typing import Any
 import pandas as pd
 
 from btc_options_mm.data.deribit_client import get_instruments, run_forever_with_reconnect
+
+logger = logging.getLogger(__name__)
 
 TABLES = ("orderbook", "ticker", "trades")
 
@@ -93,9 +97,25 @@ def _build_channels(currency: str, depth: int) -> list[str]:
 
 
 def _flush_all(buffers: dict[str, list[dict[str, Any]]], out_dir: str | Path) -> None:
+    """Write and clear every non-empty buffer.
+
+    A write failure (disk full/quota hit, permissions, etc.) is logged and
+    that batch is dropped rather than left to accumulate: on a long-running
+    background recorder, losing one flush interval's data is far preferable
+    to either an unbounded memory buffer or a crashed process that stops
+    recording entirely until someone notices and restarts it. Deliberately
+    broad except -- this is the isolation boundary for exactly that.
+    """
     for table, rows in buffers.items():
-        if rows:
+        if not rows:
+            continue
+        try:
             write_partition(list(rows), table, out_dir)
+        except Exception:
+            logger.exception(
+                "Failed to write %d buffered %s rows -- dropping this batch", len(rows), table
+            )
+        finally:
             rows.clear()
 
 
@@ -142,11 +162,27 @@ async def record(
     )
     flush_task = asyncio.create_task(_flush_loop(buffers, out_dir, flush_interval))
 
+    # A plain `kill <pid>` sends SIGTERM, which Python does not turn into a
+    # catchable exception by default -- the process would die on the spot,
+    # skipping the finally block below and losing whatever's buffered since
+    # the last flush. Route both SIGTERM and SIGINT through stop_event so a
+    # background daemon killed the ordinary way still shuts down cleanly.
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(NotImplementedError, ValueError):
+            loop.add_signal_handler(sig, stop_event.set)
+
+    wait_tasks = [record_task, asyncio.create_task(stop_event.wait())]
+    if duration is not None:
+        wait_tasks.append(asyncio.create_task(asyncio.sleep(duration)))
+
     try:
-        if duration is not None:
-            await asyncio.sleep(duration)
-        else:
-            await record_task
+        done, pending = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+        if record_task in done:
+            record_task.result()  # re-raise if it ended on an actual error
     finally:
         record_task.cancel()
         flush_task.cancel()
