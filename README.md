@@ -331,10 +331,10 @@ These assumptions bias results upward; the report states each one next to the af
 
 ## Roadmap
 
-- [ ] Data recorder and loader
-- [ ] Black-76 pricing, Greeks, implied vol solver
-- [ ] SVI fitting and arbitrage checks
-- [ ] PnL attribution validated on simulated paths
+- [x] Black-76 pricing, Greeks, implied vol solver
+- [x] SVI fitting and arbitrage checks
+- [x] PnL attribution validated on simulated paths
+- [x] Data recorder (loader still pending -- nothing to load until there's more data on disk)
 - [ ] Hedging rule comparison on real data
 - [ ] Quoter, inventory manager and fill models
 - [ ] Event-driven backtest engine
