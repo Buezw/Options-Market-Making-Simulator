@@ -13,6 +13,10 @@ authors = [{ name = "Jingnan Huang" }]
 dependencies = [
     "numpy",
     "scipy",
+    "websockets",
+    "httpx",
+    "pandas",
+    "pyarrow",
 ]
 
 [project.optional-dependencies]

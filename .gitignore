@@ -12,7 +12,7 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-data/
+/data/
 reports/figures/*
 !reports/figures/.gitkeep
 
